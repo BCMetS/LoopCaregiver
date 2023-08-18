@@ -9,7 +9,7 @@ import SwiftUI
 import Charts
 import LoopKit
 import HealthKit
-import NightscoutKit
+import LoopKitUI
 
 struct NightscoutChartScrollView: View {
 
@@ -79,6 +79,11 @@ struct NightscoutChartView: View {
         return remoteDataSource.carbEntries
             .map({$0.graphItem(egvValues: glucoseGraphItems(), displayUnit: settings.glucoseDisplayUnits)})
     }
+
+    func remoteCommandGraphItems() -> [GraphItem] {
+        return remoteDataSource.recentCommands
+            .compactMap({$0.graphItem(egvValues: glucoseGraphItems(), displayUnit: settings.glucoseDisplayUnits)})
+    }
     
     var body: some View {
         
@@ -89,13 +94,17 @@ struct NightscoutChartView: View {
                     y: .value("Reading", $0.value)
                 )
                 .foregroundStyle(by: .value("Reading", $0.colorType))
+                .symbol(
+                    FilledCircle()
+                )
             }
             if settings.timelinePredictionEnabled {
                 ForEach(predictionGraphItems()){
-                    PointMark(
+                    LineMark(
                         x: .value("Time", $0.displayTime),
                         y: .value("Reading", $0.value)
                     )
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [7.0, 3.0]))
                     .foregroundStyle(Color(uiColor: .magenta.withAlphaComponent(0.5)))
                 }   
             }
@@ -104,7 +113,7 @@ struct NightscoutChartView: View {
                     x: .value("Time", graphItem.displayTime),
                     y: .value("Reading", graphItem.value)
                 )
-                .foregroundStyle(by: .value("Reading", graphItem.colorType))
+                .foregroundStyle(by: .value("Reading", ColorType.clear))
                 .annotation(position: .overlay, alignment: .center, spacing: 0) {
                     return TreatmentAnnotationView(graphItem: graphItem)
                 }
@@ -114,7 +123,17 @@ struct NightscoutChartView: View {
                     x: .value("Time", graphItem.displayTime),
                     y: .value("Reading", graphItem.value)
                 )
-                .foregroundStyle(by: .value("Reading", graphItem.colorType))
+                .foregroundStyle(by: .value("Reading", ColorType.clear))
+                .annotation(position: .overlay, alignment: .center, spacing: 0) {
+                    return TreatmentAnnotationView(graphItem: graphItem)
+                }
+            }
+            ForEach(remoteCommandGraphItems()) { graphItem in
+                PointMark(
+                    x: .value("Time", graphItem.displayTime),
+                    y: .value("Reading", graphItem.value)
+                )
+                .foregroundStyle(by: .value("Reading", ColorType.clear))
                 .annotation(position: .overlay, alignment: .center, spacing: 0) {
                     return TreatmentAnnotationView(graphItem: graphItem)
                 }
@@ -246,8 +265,14 @@ struct NightscoutChartView: View {
 enum GraphItemType {
     case egv
     case predictedBG
-    case bolus(BolusNightscoutTreatment)
-    case carb(CarbCorrectionNightscoutTreatment)
+    case bolus(Double)
+    case carb(Int)
+}
+
+enum GraphItemState {
+    case success
+    case pending
+    case error(Error)
 }
 
 struct GraphItem: Identifiable, Equatable {
@@ -257,6 +282,7 @@ struct GraphItem: Identifiable, Equatable {
     var displayTime: Date
     var displayUnit: HKUnit
     var quantity: HKQuantity
+    let graphItemState: GraphItemState
     
     var value: Double {
         return quantity.doubleValue(for: displayUnit)
@@ -266,20 +292,21 @@ struct GraphItem: Identifiable, Equatable {
         return ColorType(quantity: quantity)
     }
     
-    init(type: GraphItemType, displayTime: Date, quantity: HKQuantity, displayUnit: HKUnit) {
+    init(type: GraphItemType, displayTime: Date, quantity: HKQuantity, displayUnit: HKUnit, graphItemState: GraphItemState) {
         self.type = type
         self.displayTime = displayTime
         self.displayUnit = displayUnit
         self.quantity = quantity
+        self.graphItemState = graphItemState
     }
     
     func annotationWidth() -> CGFloat {
         var width: CGFloat = 0.0
         switch self.type {
-        case .bolus(let bolusEntry):
-            width = CGFloat(bolusEntry.amount) * 5.0
-        case .carb(let carbEntry):
-            width = CGFloat(carbEntry.carbs) * 0.5
+        case .bolus(let amount):
+            width = CGFloat(amount) * 5.0
+        case .carb(let amount):
+            width = CGFloat(amount) * 0.5
         default:
             width = 0.5
         }
@@ -304,10 +331,10 @@ struct GraphItem: Identifiable, Equatable {
         
         var size = 0.0
         switch self.type {
-        case .bolus(let bolusEntry):
-            size = Double(3 * bolusEntry.amount)
-        case .carb(let carbEntry):
-            size = Double(carbEntry.carbs / 2)
+        case .bolus(let amount):
+            size = 3 * amount
+        case .carb(let amount):
+            size = Double(amount) / 2
         default:
             size = 10
         }
@@ -335,7 +362,7 @@ struct GraphItem: Identifiable, Equatable {
         }
     }
     
-    func annotationFillColor() -> Color {
+    func annotationFillColor() -> AnnotationColorStyle {
         switch self.type {
         case .bolus:
             return .blue
@@ -348,10 +375,10 @@ struct GraphItem: Identifiable, Equatable {
     
     func formattedValue() -> String {
         switch self.type {
-        case .bolus(let bolusEntry):
+        case .bolus(let amount):
             
             var maxFractionalDigits = 0
-            if bolusEntry.amount > 1 {
+            if amount > 1 {
                 maxFractionalDigits = 1
             } else {
                 maxFractionalDigits = 2
@@ -361,10 +388,10 @@ struct GraphItem: Identifiable, Equatable {
             formatter.minimumFractionDigits = 0
             formatter.maximumFractionDigits = maxFractionalDigits
             formatter.numberStyle = .decimal
-            let bolusQuantityString = formatter.string(from: bolusEntry.amount as NSNumber) ?? ""
+            let bolusQuantityString = formatter.string(from: amount as NSNumber) ?? ""
             return bolusQuantityString + "u"
-        case .carb(let carbEntry):
-            return "\(carbEntry.carbs)g"
+        case .carb(let amount):
+            return "\(amount)g"
         case .egv:
             return "\(self.value)"
         case .predictedBG:
@@ -405,6 +432,37 @@ struct GraphItem: Identifiable, Equatable {
     }
 }
 
+enum AnnotationColorStyle {
+    case brown
+    case blue
+    case red
+    case yellow
+    case black
+    case clear
+    
+    func color(scheme: ColorScheme) -> Color {
+        switch self {
+        case .brown:
+            if scheme == .dark {
+                return .white
+            } else {
+                return . brown
+            }
+        case .blue:
+            return .blue
+        case .red:
+            return .red
+        case .yellow:
+            return .yellow
+        case .black:
+            return .black
+        case .clear:
+            return .clear
+        }
+    }
+}
+
+
 enum ColorType: Int, Plottable, CaseIterable, Comparable {
     
     var primitivePlottable: Int {
@@ -417,6 +475,7 @@ enum ColorType: Int, Plottable, CaseIterable, Comparable {
     case green
     case yellow
     case red
+    case clear
     
     init?(primitivePlottable: Int){
         self.init(rawValue: primitivePlottable)
@@ -451,6 +510,8 @@ enum ColorType: Int, Plottable, CaseIterable, Comparable {
             return Color.yellow
         case .red:
             return Color.red
+        case .clear:
+            return Color.clear
         }
     }
     
@@ -504,4 +565,14 @@ struct NightscoutChartConfiguration {
     let graphTotalDays = 1
     let daysPerVisbleScrollFrame = 0.3
     let graphTag = 1000
+}
+
+struct FilledCircle: Shape, ChartSymbolShape {
+    var perceptualUnitRect: CGRect = CGRect(x: 0.0, y: 0.0, width: 1.0, height: 1.0)
+    
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.addEllipse(in: rect.scaledBy(0.55))
+        return path
+    }
 }
