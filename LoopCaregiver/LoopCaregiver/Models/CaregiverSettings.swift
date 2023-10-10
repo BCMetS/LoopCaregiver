@@ -14,12 +14,14 @@ class CaregiverSettings: ObservableObject {
     @Published var timelinePredictionEnabled: Bool
     @Published var experimentalFeaturesUnlocked: Bool
     @Published var remoteCommands2Enabled: Bool
+    @Published var demoModeEnabled: Bool
     @Published var disclaimerAcceptedDate: Date?
     
     init(){
         self.glucoseDisplayUnits = UserDefaults.standard.glucosePreference.unit
         self.timelinePredictionEnabled = UserDefaults.standard.timelinePredictionEnabled
         self.remoteCommands2Enabled = UserDefaults.standard.remoteCommands2Enabled
+        self.demoModeEnabled = UserDefaults.standard.demoModeEnabled
         self.experimentalFeaturesUnlocked = UserDefaults.standard.experimentalFeaturesUnlocked
         self.disclaimerAcceptedDate = UserDefaults.standard.disclaimerAcceptedDate
         
@@ -38,6 +40,10 @@ class CaregiverSettings: ObservableObject {
         
         if self.remoteCommands2Enabled != UserDefaults.standard.remoteCommands2Enabled {
             self.remoteCommands2Enabled = UserDefaults.standard.remoteCommands2Enabled
+        }
+        
+        if self.demoModeEnabled != UserDefaults.standard.demoModeEnabled {
+            self.demoModeEnabled = UserDefaults.standard.demoModeEnabled
         }
         
         if self.experimentalFeaturesUnlocked != UserDefaults.standard.experimentalFeaturesUnlocked {
@@ -86,8 +92,16 @@ extension UserDefaults {
         return "timelinePredictionEnabled"
     }
     
+    var timelineVisibleLookbackHoursKey: String {
+        return "timelineVisibleLookbackHours"
+    }
+    
     var remoteCommands2EnabledKey: String {
         return "remoteCommands2Enabled"
+    }
+    
+    var demoModeEnabledKey: String {
+        return "demoModeEnabled"
     }
     
     var experimentalFeaturesUnlockedKey: String {
@@ -108,6 +122,10 @@ extension UserDefaults {
     
     @objc dynamic var remoteCommands2Enabled: Bool {
         return UserDefaults.standard.bool(forKey: remoteCommands2EnabledKey)
+    }
+    
+    @objc dynamic var demoModeEnabled: Bool {
+        return UserDefaults.standard.bool(forKey: demoModeEnabledKey)
     }
     
     @objc dynamic var experimentalFeaturesUnlocked: Bool {
