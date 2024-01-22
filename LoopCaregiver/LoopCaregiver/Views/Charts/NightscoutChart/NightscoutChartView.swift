@@ -5,12 +5,12 @@
 //  Created by Bill Gestrich on 11/13/22.
 //
 
-import SwiftUI
 import Charts
-import LoopKit
-import HealthKit
-import LoopKitUI
 import Combine
+import HealthKit
+import LoopCaregiverKit
+import LoopKit
+import SwiftUI
 
 struct NightscoutChartScrollView: View {
     
@@ -657,7 +657,7 @@ enum ColorType: Int, Plottable, CaseIterable, Comparable {
     init(quantity: HKQuantity) {
         let glucose = quantity.doubleValue(for:.milligramsPerDeciliter)
         switch glucose {
-        case 0..<55:
+        case -Double.infinity..<55:
             self = ColorType.red
         case 55..<70:
             self = ColorType.yellow

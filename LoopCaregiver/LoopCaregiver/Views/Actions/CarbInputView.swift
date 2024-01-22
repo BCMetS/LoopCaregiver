@@ -5,9 +5,10 @@
 //  Created by Bill Gestrich on 11/13/22.
 //
 
-import SwiftUI
-import LoopKitUI
 import LocalAuthentication
+import LoopCaregiverKit
+import LoopKitUI
+import SwiftUI
 
 struct CarbInputView: View {
     
@@ -41,6 +42,7 @@ struct CarbInputView: View {
                     if let errorText {
                         Text(errorText)
                             .foregroundColor(.critical)
+                            .padding()
                     }
                     Text("Carbs will be stored without accepting any recommended bolus. Storing carbs may increase automatic insulin delivery per your Loop Settings.")
                         .padding()
@@ -253,10 +255,18 @@ struct CarbInputView: View {
         let _ = try getCarbFieldValues()
     }
     
+    private func maxCarbAmount() -> Int {
+        return looperService.settings.maxCarbAmount
+    }
+    
     private func getCarbFieldValues() throws -> CarbInputViewFormValues {
         
-        guard let carbAmountInGrams = LocalizationUtils.doubleFromUserInput(carbInput), carbAmountInGrams > 0, carbAmountInGrams <= 250 else { //TODO: Check Looper's max carb amount
+        guard let carbAmountInGrams = LocalizationUtils.doubleFromUserInput(carbInput), carbAmountInGrams > 0 else {
             throw CarbInputViewError.invalidCarbAmount
+        }
+        
+        guard carbAmountInGrams <= Double(maxCarbAmount()) else {
+            throw CarbInputViewError.exceedsMaxAllowed(maxAllowed: maxCarbAmount())
         }
         
         guard let absorptionInHours = LocalizationUtils.doubleFromUserInput(absorption), absorptionInHours >= minAbsorptionTimeInHours, absorptionInHours <= maxAbsorptionTimeInHours else {
@@ -318,6 +328,7 @@ struct CarbInputViewFormValues {
 
 enum CarbInputViewError: LocalizedError {
     case invalidCarbAmount
+    case exceedsMaxAllowed(maxAllowed: Int)
     case invalidAbsorptionTime(minAbsorptionTimeInHours: Double, maxAbsorptionTimeInHours: Double)
     case exceedsMaxPastHours(maxPastHours: Int)
     case exceedsMaxFutureHours(maxFutureHours: Int)
@@ -325,7 +336,9 @@ enum CarbInputViewError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidCarbAmount:
-            return "Enter a carb amount between 1 and the max allowed in Loop Settings"
+            return "Enter a valid carb amount in grams."
+        case .exceedsMaxAllowed(let maxAllowed):
+            return "Enter a carb amount up to \(maxAllowed) g. The maximum can be increased in Caregiver Settings."
         case .invalidAbsorptionTime(let minAbsorptionTimeInHours, let maxAbsorptionTimeInHours):
             let presentableMinAbsorptionInHours = LocalizationUtils.presentableStringFromHoursAmount(minAbsorptionTimeInHours)
             let presentableMaxAbsorptionInHours = LocalizationUtils.presentableStringFromHoursAmount(maxAbsorptionTimeInHours)
@@ -344,4 +357,13 @@ enum CarbInputViewError: LocalizedError {
             return "hour"
         }
     }
+}
+
+#Preview {
+    let composer = ServiceComposerPreviews()
+    let looper = composer.accountServiceManager.selectedLooper!
+    var showSheetView = true
+    let showSheetBinding = Binding<Bool>(get: {showSheetView}, set: {showSheetView = $0})
+    let looperService = composer.accountServiceManager.createLooperService(looper: looper, settings: composer.settings)
+    return CarbInputView(looperService: looperService, showSheetView: showSheetBinding)
 }
