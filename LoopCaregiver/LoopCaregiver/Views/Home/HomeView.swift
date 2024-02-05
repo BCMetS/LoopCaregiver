@@ -37,6 +37,8 @@ struct HomeView: View {
         VStack {
             HUDView(looperService: looperService, settings: looperService.settings)
                 .padding([.leading, .trailing])
+                .padding([.bottom], 5.0)
+                .background(Color.cellBackgroundColor)
             if let recommendedBolus = remoteDataSource.recommendedBolus {
                 TitleSubtitleRowView(title: "Recommended Bolus", subtitle: LocalizationUtils.presentableStringFromBolusAmount(recommendedBolus) + " U")
                     .padding([.bottom, .trailing], 5.0)
@@ -105,7 +107,5 @@ struct HomeView: View {
     var showSheetView = true
     let showSheetBinding = Binding<Bool>(get: {showSheetView}, set: {showSheetView = $0})
     let looperService = composer.accountServiceManager.createLooperService(looper: looper, settings: composer.settings)
-    let remoteDataSerivceManager = RemoteDataServiceManager(remoteDataProvider: RemoteDataServiceProviderSimulator())
-    
     return HomeView(looperService: looperService, watchManager: composer.watchManager)
 }

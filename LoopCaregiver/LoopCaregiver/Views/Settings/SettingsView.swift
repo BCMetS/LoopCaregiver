@@ -218,15 +218,17 @@ struct SettingsView: View {
                 SectionHeader(label: "Diagnostics")
             }
             Section {
-                Button("Enable Watch App") {
-                    watchManager.send(addLooperDeepLink)
+                Button("Activate Loopers") {
+                    do {
+                        try activateLoopersOnWatch()
+                    } catch {
+                        print("Error activating Loopers on watch: \(error)")
+                    }
                 }
-                LabeledContent("Watch Last Sent Message", value: watchManager.lastMessageSent?.description ?? "None")
-                LabeledContent("Watch Reachable", value: watchManager.isReachable() ? "YES" : "NO")
-                LabeledContent("Activated", value: watchManager.activated ? "YES" : "NO")
                 
-                Text("The Apple Watch app is very early in development. Search Zulip #caregiver for details")
+                Text("Ensure the Watch app is open before activating Loopers.")
                     .font(.footnote)
+                LabeledContent("Watch App Open", value: watchManager.isReachable() ? "YES" : "NO")
             } header: {
                 SectionHeader(label: "Apple Watch")
             }
@@ -236,6 +238,14 @@ struct SettingsView: View {
                     settings.experimentalFeaturesUnlocked = true
                 })
         }
+    }
+    
+    func activateLoopersOnWatch() throws {
+        let loopers = accountService.loopers
+        let watchConfiguration = WatchConfiguration(loopers: loopers)
+        let data = try JSONEncoder().encode(watchConfiguration)
+        let dataString = String(data: data, encoding: .utf8)!
+        watchManager.send(dataString)
     }
     
     var addLooperDeepLink: String {

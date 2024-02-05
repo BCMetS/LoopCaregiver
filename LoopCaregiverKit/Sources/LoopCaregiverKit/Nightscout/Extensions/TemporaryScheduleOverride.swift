@@ -24,6 +24,15 @@ public extension TemporaryScheduleOverride {
     }
 }
 
+public extension OverrideStatus {
+    func endTimeDescription() -> String? {
+        guard let duration, duration < 60 * 60 * 24 else { return nil }
+        let endDate = timestamp.addingTimeInterval(duration)
+        let endTimeText = DateFormatter.localizedString(from: endDate, dateStyle: .none, timeStyle: .short)
+        return String(format: NSLocalizedString("until %@", comment: "The format for the description of a custom preset end date"), endTimeText)
+    }
+}
+
 extension TemporaryScheduleOverride: Hashable {
 
     public func hash(into hasher: inout Hasher) {
