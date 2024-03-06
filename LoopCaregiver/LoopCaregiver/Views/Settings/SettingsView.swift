@@ -17,7 +17,7 @@ struct SettingsView: View {
     @ObservedObject var nightscoutCredentialService: NightscoutCredentialService
     @ObservedObject var accountService: AccountServiceManager
     @ObservedObject var settings: CaregiverSettings
-    @ObservedObject var watchManager: WatchConnectivityManager
+    @ObservedObject var watchService: WatchService
     @Binding var showSheetView: Bool
     @State private var isPresentingConfirm: Bool = false
     @State private var path = NavigationPath()
@@ -28,13 +28,13 @@ struct SettingsView: View {
     @State var maxBolusAmountPickerShowing = false
     private let maxBolusIncrements = Array(stride(from: 0, through: 10, by: 1))
     
-    init(looperService: LooperService, accountService: AccountServiceManager, settings: CaregiverSettings, watchManager: WatchConnectivityManager, showSheetView: Binding<Bool>) {
+    init(looperService: LooperService, accountService: AccountServiceManager, settings: CaregiverSettings, watchService: WatchService, showSheetView: Binding<Bool>) {
         self.settingsViewModel = SettingsViewModel(selectedLooper: looperService.looper, accountService: looperService.accountService, settings: settings)
         self.looperService = looperService
         self.nightscoutCredentialService = NightscoutCredentialService(credentials: looperService.looper.nightscoutCredentials)
         self.accountService = accountService
         self.settings = settings
-        self.watchManager = watchManager
+        self.watchService = watchService
         self._showSheetView = showSheetView
     }
     
@@ -199,6 +199,21 @@ struct SettingsView: View {
         
         if settings.experimentalFeaturesUnlocked || settings.remoteCommands2Enabled {
             Section {
+                Button("Setup Watch") {
+                    do {
+                        try activateLoopersOnWatch()
+                    } catch {
+                        print("Error activating Loopers on watch: \(error)")
+                    }
+                }
+                
+                Text("Ensure the Watch app is open before activating Loopers.")
+                    .font(.footnote)
+                LabeledContent("Watch App Open", value: watchService.isReachable() ? "YES" : "NO")
+            } header: {
+                SectionHeader(label: "Apple Watch")
+            }
+            Section {
                 Toggle("Remote Commands 2", isOn: $settings.remoteCommands2Enabled)
                 Text("Remote commands 2 requires a special Nightscout deploy and Loop version. This will enable command status and other features. See Zulip #caregiver for details")
                     .font(.footnote)
@@ -217,35 +232,24 @@ struct SettingsView: View {
             } header: {
                 SectionHeader(label: "Diagnostics")
             }
-            Section {
-                Button("Activate Loopers") {
-                    do {
-                        try activateLoopersOnWatch()
-                    } catch {
-                        print("Error activating Loopers on watch: \(error)")
-                    }
-                }
-                
-                Text("Ensure the Watch app is open before activating Loopers.")
-                    .font(.footnote)
-                LabeledContent("Watch App Open", value: watchManager.isReachable() ? "YES" : "NO")
-            } header: {
-                SectionHeader(label: "Apple Watch")
-            }
         } else {
-            Text("Disabled                             ")
-                .simultaneousGesture(LongPressGesture(minimumDuration: 5.0).onEnded { _ in
-                    settings.experimentalFeaturesUnlocked = true
-                })
+            Section {
+                Text("Disabled                             ")
+                    .simultaneousGesture(LongPressGesture(minimumDuration: 5.0).onEnded { _ in
+                        settings.experimentalFeaturesUnlocked = true
+                    })
+            } header: {
+                SectionHeader(label: "Diagnostics")
+            }
         }
     }
     
     func activateLoopersOnWatch() throws {
-        let loopers = accountService.loopers
-        let watchConfiguration = WatchConfiguration(loopers: loopers)
-        let data = try JSONEncoder().encode(watchConfiguration)
-        let dataString = String(data: data, encoding: .utf8)!
-        watchManager.send(dataString)
+        do {
+            try watchService.sendLoopersToWatch()
+        } catch {
+            print("Error activating Loopers \(error)")
+        }
     }
     
     var addLooperDeepLink: String {
@@ -414,7 +418,7 @@ struct SettingsView: View {
     let showSheetBinding = Binding<Bool>(get: {showSheetView}, set: {showSheetView = $0})
     let looperService = composer.accountServiceManager.createLooperService(looper: looper, settings: composer.settings)
     let remoteDataSerivceManager = RemoteDataServiceManager(remoteDataProvider: RemoteDataServiceProviderSimulator())
-    return SettingsView(looperService: looperService, accountService: composer.accountServiceManager, settings: composer.settings, watchManager: composer.watchManager, showSheetView: showSheetBinding)
+    return SettingsView(looperService: looperService, accountService: composer.accountServiceManager, settings: composer.settings, watchService: composer.watchService, showSheetView: showSheetBinding)
 }
 
 

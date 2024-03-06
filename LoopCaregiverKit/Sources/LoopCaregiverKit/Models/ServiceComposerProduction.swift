@@ -10,7 +10,7 @@ import Foundation
 public class ServiceComposerProduction: ServiceComposer {
     public let settings: CaregiverSettings
     public let accountServiceManager: AccountServiceManager
-    public let watchManager: WatchConnectivityManager
+    public let watchService: WatchService
     
     public init() {
         let userDefaults: UserDefaults
@@ -28,6 +28,7 @@ public class ServiceComposerProduction: ServiceComposer {
         
         self.settings = CaregiverSettings(userDefaults: userDefaults, appGroupsSupported: appGroupsSupported)
         self.accountServiceManager = AccountServiceManager(accountService: CoreDataAccountService(containerFactory: containerFactory))
-        self.watchManager = WatchConnectivityManager()
+
+        self.watchService = WatchService(accountService: self.accountServiceManager)
     }
 }
